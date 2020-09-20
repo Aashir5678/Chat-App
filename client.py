@@ -3,13 +3,13 @@ import pickle
 
 
 class Client:
-    def __init__(self, username, port=5050):
+    def __init__(self, username, port=5050, ip=socket.gethostbyname(socket.gethostname()):
         self.PORT = port
         self.HEADER = 64
         self.username = username
         self.FORMAT = "utf-8"
         self.DISCONNECT_MESSAGE = "!DISCONNECT"
-        self.socket = socket.gethostbyname(socket.gethostname())
+        self.socket = ip
 
         self.connected = True
         self.messages = []
