@@ -10,31 +10,62 @@ class ServerGUI:
         self.ON_CLOSE = "WM_DELETE_WINDOW"
 
         self.server = None
-        self.server_thread = threading.Thread(target=self.make_server)
-        self.ServerLabel = tk.Label(self.parent)
-        self.PortLabel = tk.Label(self.parent)
-        self.ChatListbox = tk.Listbox(self.parent, height=30, width=80)
+        self.server_password = None
+        self.PortLabel = tk.Label(self.parent, text="Port:")
+        self.PortEntry = tk.Entry(self.parent)
+
+        self.PasswordLabel = tk.Label(self.parent, text="Server password:")
+        self.PasswordEntry = tk.Entry(self.parent)
+
+        self.ClientsListbox = tk.Listbox(self.parent, height=30, width=30)
+        self.ReloadButton = tk.Button(self.parent, text="Reload", command=self.reload)
 
         self.parent.protocol(self.ON_CLOSE, self.quit)
 
-        self.ServerLabel.pack()
         self.PortLabel.pack()
-        self.server_thread.start()
+        self.PortEntry.pack()
+        self.PasswordLabel.pack()
+        self.PasswordEntry.pack()
+
+        self.PortEntry.insert(0, "5050")
+        self.server_thread = threading.Thread(target=self.make_server, args=(self.PortEntry.get(),))
+        self.server_thread.daemon = True
+        self.parent.bind("<Return>", lambda event: self.run_thread())
 
         self.parent.iconify()
         self.parent.update()
         self.parent.deiconify()
 
-    def make_server(self):
-        """Makes the server"""
-        self.server = Server()
+    def run_thread(self):
+        self.server_thread.start()
+
+    def reload(self):
+        self.ClientsListbox.delete(0, tk.END)
+
         for client in self.server.connected_clients:
-            self.ClientsListbox.insert(client.username)
+            self.ClientsListbox.insert(tk.END, client.username)
 
-        self.ServerLabel.config(text="Server has started...")
-        self.PortLabel.config(text=f"Port: {self.server.PORT}")
+    def make_server(self, port):
+        """Makes the server"""
+        try:
+            port = int(port)
 
-        self.ChatListbox.pack()
+        except ValueError:
+            return
+
+        self.server_password = self.PasswordEntry.get()
+        self.server = Server(port, password=self.server_password)
+
+        self.PortEntry.destroy()
+        self.PasswordEntry.destroy()
+
+        self.PasswordLabel.config(text="Server password: " + (self.server_password if self.server_password else "No password"))
+
+        self.PortLabel.config(text="Port: " + str(port))
+
+        self.ClientsListbox.pack()
+        self.ReloadButton.pack()
+
         self.server.start()
 
     def quit(self):

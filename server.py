@@ -1,20 +1,25 @@
 import socket
 import threading
 import pickle
-from client import Client
+from client import Client, ClientInfo
 
 
 class Server:
-    HEADER = 64
+    """Represents a server that holds clients"""
+    HEADER = 2048
 
-    def __init__(self, port=5050):
+    def __init__(self, port=5050, password=""):
         self.PORT = port
-        self.HEADER = 64
+        self.password = password
+        self.HEADER = 2048
         self.FORMAT = "utf-8"
+        self.SUCCESS = "SUCCESSFUL CONNECTION"
+        self.FAIL = "FAILED CONNECTION"
         self.DISCONNECT_MESSAGE = "!DISCONNECT"
         self.SERVER = socket.gethostbyname(socket.gethostname())
-
         self.connected_clients = []
+        self.connections = []
+        self.all_client_info = []
         self.ADDR = (self.SERVER, self.PORT)
         self.closed = False
 
@@ -33,12 +38,23 @@ class Server:
 
     def handle_client(self, conn, addr):
         client = self.create_client(conn)
+        if client is None:
+            conn.send(self.FAIL.encode(self.FORMAT))
+            return
 
+        conn.send(self.SUCCESS.encode(self.FORMAT))
         self.connected_clients.append(client)
         print (client.username + " has joined the chat !")
+        self.connections.append(conn)
 
         while client.connected:
-            message_len = self.receive_message(conn)
+            try:
+                message_len = self.receive_message(conn)
+
+            except ConnectionResetError:
+                client.connected = False
+                break
+
             if message_len:
                 message_len = int(message_len)
                 message = self.receive_message(conn, size=message_len)
@@ -49,128 +65,100 @@ class Server:
                 elif message is None:
                     continue
 
-                print (client.username + "> " + message)
+                print (f"{client.username}: {message}")
+                self.connected_clients.remove(client)
+                client_info = self.make_client_info(client)
+                self.all_client_info.remove(client_info)
+
+                send = pickle.dumps(client_info)
+                for connection in self.connections:
+                    connection.send("UPDATE CLIENT INFO".encode(self.FORMAT))
+                    connection.send(send)
+
+                client.messages.append(message)
+                self.connected_clients.append(client)
+                client_info = self.make_client_info(client)
+                self.all_client_info.append(client_info)
+
+                send = pickle.dumps(client_info)
+                for connection in self.connections:
+                    connection.send(send)
+
+                # for connection in self.connections:
+                #     connection.send(f"{client_info.username} {message}".encode(self.FORMAT))
 
         print(f"{client.username} has disconnected !")
-        self.connected_clients.remove(client)
+        self.connected_clients.remove(self.make_client_info(client))
+        client_info = self.make_client_info(client)
+        self.all_client_info.remove(client_info)
+        self.connections.remove(conn)
         client.disconnect()
 
     def create_client(self, conn):
         message_len = self.receive_message(conn)
         if message_len:
             message_len = int(message_len)
-            message = self.receive_message(conn, size=message_len)
+            password = self.receive_message(conn, size=message_len)
 
         else:
             return None
 
-        client = Client(message)
-        self.connected_clients.append(client)
+        if password != self.password:
+            return None
 
-        usernames = [client.username for client in self.connected_clients]
-        usernames = pickle.dumps(usernames)
+        message_len = self.receive_message(conn)
+        if message_len:
+            message_len = int(message_len)
+            username = self.receive_message(conn, size=message_len)
 
-        conn.send(usernames)
+        else:
+            return None
+
+        client = Client(username, connected=True)
+        client_info = self.make_client_info(client)
+        print (client)
+        print (client_info)
+
+        self.all_client_info.append(client_info)
+        for connection in self.connections:
+            client_info = pickle.dumps(client_info)
+            connection.send("NEW CLIENT".encode(self.FORMAT))
+            connection.send(client_info)
+
+        # for connection in self.connections:
+        #     send = pickle.dumps(client_info)
+        #     connection.send(send)
+
+        all_client_info = pickle.dumps(self.all_client_info)
+        conn.send(all_client_info)
+        conn.send("SEND COMPLETE".encode(self.FORMAT))
 
         return client
 
-    def receive_message(self, conn, size=HEADER):
-        message = conn.recv(size).decode(self.FORMAT)
-        if message:
-            return message
+    def make_client_info(self, client):
+        username = client.username
+        messages = client.messages
+        port = client.PORT
+        server_machine = client.server_machine
+        connected = client.connected
 
-        return None
+        return ClientInfo(username, messages, port=port, server_machine=server_machine, connected=connected)
+
+    def receive_message(self, conn, size=HEADER, decode=True):
+        if decode:
+            message = conn.recv(size).decode(self.FORMAT)
+
+        else:
+            message = conn.recv(size)
+        return message
 
     def close(self):
         self.server.close()
 
     def __repr__(self):
-        return f"SERVER {self.PORT}"
+        return f"Server on {self.PORT}"
 
 
 if __name__ == "__main__":
     server = Server()
     server.start()
-
-#
-# class Server:
-#     def __init__(self, port=5050):
-#         self.PORT = port
-#         self.HEADER = 1048
-#         self.FORMAT = "utf-8"
-#         self.DISCONNECT_MESSAGE = "!DISCONNECT"
-#         self.SERVER = socket.gethostbyname(socket.gethostname())
-#         self.clients = []
-#         self.ADDR = (self.SERVER, self.PORT)
-#         self.closed = False
-#
-#         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#         self.server.bind(self.ADDR)
-#
-#         print ("[START] server is starting...")
-#         self.start()
-#
-#     def start(self):
-#         """Starts the server"""
-#         self.server.listen()
-#
-#         while True:
-#             conn, addr = self.server.accept()
-#
-#             thread = threading.Thread(target=self.handle_client, args=(conn,))
-#             thread.start()
-#
-#             print (f"[CLIENTS] number of clients {threading.activeCount() - 1}")
-#
-#     def handle_client(self, conn):
-#         """Handles a client when they join"""
-#
-#         username = self.receive_msg(conn=conn)
-#         client = Client(username)
-#         self.clients.append(client)
-#         print(f"[NEW CLIENT] new client {client.username}")
-#         msg = True
-#
-#         while msg:
-#             msg = self.receive_msg()
-#             if msg is False or self.closed:
-#                 break
-#
-#             msg = f"{client.username}> {msg}"
-#
-#             print (client.messages)
-#
-#         print (f"[DISCONNECT] {client.username} disconnected")
-#         conn.close()
-#
-#     def receive_msg(self, conn=None):
-#         """Receives messages from the client connection"""
-#         if self.clients:
-#             client = self.clients[-1].client
-#
-#         elif conn is not None:
-#             client = conn
-#
-#         else:
-#             return
-#
-#         message = client.recv(self.HEADER).decode(self.FORMAT)
-#         if message:
-#             if self.clients:
-#                 self.clients[-1].messages.append(message)
-#
-#             if message == self.DISCONNECT_MESSAGE:
-#                 client_connected = False
-#                 return client_connected
-#
-#             return message
-#
-#     def close(self):
-#         """Closes the server"""
-#         self.closed = True
-#         self.server.shutdown(socket.SHUT_RDWR)
-#         self.server.close()
-#
-#
-# if __name__ == "__main__":
-#     server = Server()

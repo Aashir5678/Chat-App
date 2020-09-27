@@ -16,6 +16,7 @@ class App:
         self.ON_CLOSE = "WM_DELETE_WINDOW"
         self.DISCONNECT_MESSAGE = "!DISCONNECT"
         self.connected_clients = []
+        self.messages = []
         self.client = None
 
         self.UsernameLabel = tk.Label(self.parent, text="Username:", font=("Comic Sans", 15, "bold"))
@@ -70,6 +71,9 @@ class App:
         """Creates a client with the username provided"""
         self.client = Client(username)
         self.client.connect()
+        for client_info in self.client.all_client_info:
+            for message in client_info.messages:
+                self.messages.append(f"{client_info.username}: {message}")
 
     def get_clients(self):
         """
