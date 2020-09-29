@@ -84,9 +84,6 @@ class Server:
                 for connection in self.connections:
                     connection.send(send)
 
-                # for connection in self.connections:
-                #     connection.send(f"{client_info.username} {message}".encode(self.FORMAT))
-
         print(f"{client.username} has disconnected !")
         self.connected_clients.remove(self.make_client_info(client))
         client_info = self.make_client_info(client)

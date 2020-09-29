@@ -45,6 +45,8 @@ class ServerGUI:
         for client in self.server.connected_clients:
             self.ClientsListbox.insert(tk.END, client.username)
 
+        self.parent.after(100, self.reload)
+
     def make_server(self, port):
         """Makes the server"""
         try:
@@ -65,6 +67,7 @@ class ServerGUI:
 
         self.ClientsListbox.pack()
         self.ReloadButton.pack()
+        self.reload()
 
         self.server.start()
 
