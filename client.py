@@ -57,16 +57,30 @@ class Client:
         self.all_client_info = pickle.loads(b"".join(data))
         connection_status = self.receive_message().decode(self.FORMAT)
         if connection_status == self.FAIL:
+            print("Incorrect password...")
             self.disconnect()
-            print ("Incorrect password...")
             return False
+
+        join_message = f"{self.username} has joined the chat !"
+        if join_message not in self.messages:
+            print (f"Appending: {join_message}")
+            self.messages.append(join_message)
 
         self.get_clients_thread.start()
         return True
 
     def update_all_clients(self):
         while True:
-            status = self.receive_message().decode(self.FORMAT)
+            try:
+                status = self.receive_message().decode(self.FORMAT)
+
+            except ConnectionAbortedError:
+                break
+
+            except AttributeError:
+                self.disconnect()
+                break
+
             client_info = self.receive_message()
             if status == "NEW CLIENT":
                 client_info = pickle.loads(client_info)
@@ -92,11 +106,19 @@ class Client:
         if self.connected:
             if (self.messages or message) and save_message:
                 self.client_info = self.make_client_info(self)
-                self.all_client_info.remove(self.client_info)
+                try:
+                    self.all_client_info.remove(self.client_info)
+
+                except ValueError as e:
+                    print ("[VALUE ERROR] ", e)
+
+                except Exception as e:
+                    print ("[ERROR] ", e)
+
                 self.messages.append(message)
+
                 self.client_info = self.make_client_info(self)
                 self.all_client_info.append(self.client_info)
-                print (self.all_client_info)
 
             msg = message.encode(self.FORMAT)
             msg_len = len(msg)
@@ -111,10 +133,12 @@ class Client:
         if message and message is not None:
             return message
 
+        print ("Invalid message: " + str(message))
         return None
 
     def disconnect(self):
-        self.messages.clear()
+        self.send_message(self.DISCONNECT_MESSAGE)
+        self.messages = [self.messages[-1]]
         self.client.close()
         self.connected = False
 
@@ -156,4 +180,5 @@ if __name__ == "__main__":
     while client.connected:
         msg = input(f"{client.username}> ")
         client.send_message(msg)
+        print (client.all_client_info)
 

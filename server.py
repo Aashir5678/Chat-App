@@ -43,9 +43,6 @@ class Server:
             return
 
         conn.send(self.SUCCESS.encode(self.FORMAT))
-        self.connected_clients.append(client)
-        print (client.username + " has joined the chat !")
-        self.connections.append(conn)
 
         while client.connected:
             try:
@@ -84,7 +81,9 @@ class Server:
                 for connection in self.connections:
                     connection.send(send)
 
-        print(f"{client.username} has disconnected !")
+        disconnect_message = f"{client.username} has disconnected !"
+        print (disconnect_message)
+        client.messages.append(disconnect_message)
         self.connected_clients.remove(self.make_client_info(client))
         client_info = self.make_client_info(client)
         self.all_client_info.remove(client_info)
@@ -113,19 +112,19 @@ class Server:
 
         client = Client(username, connected=True)
         client_info = self.make_client_info(client)
-        print (client)
-        print (client_info)
+
+        join_message = client.username + " has joined the chat !"
+        client_info.messages.append(join_message)
 
         self.all_client_info.append(client_info)
+        self.connected_clients.append(client)
+
         for connection in self.connections:
             client_info = pickle.dumps(client_info)
             connection.send("NEW CLIENT".encode(self.FORMAT))
             connection.send(client_info)
 
-        # for connection in self.connections:
-        #     send = pickle.dumps(client_info)
-        #     connection.send(send)
-
+        self.connections.append(conn)
         all_client_info = pickle.dumps(self.all_client_info)
         conn.send(all_client_info)
         conn.send("SEND COMPLETE".encode(self.FORMAT))
