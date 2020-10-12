@@ -61,10 +61,13 @@ class Client:
             self.disconnect()
             return False
 
+        # Add join message to messages
         join_message = f"{self.username} has joined the chat !"
-        if join_message not in self.messages:
-            print (f"Appending: {join_message}")
-            self.messages.append(join_message)
+        self.client_info = self.make_client_info(self)
+        client_info_index = self.all_client_info.index(self.client_info)
+        self.messages.append(join_message)
+        self.client_info = self.make_client_info(self)
+        self.all_client_info[client_info_index] = self.client_info
 
         self.get_clients_thread.start()
         return True
@@ -74,7 +77,7 @@ class Client:
             try:
                 status = self.receive_message().decode(self.FORMAT)
 
-            except ConnectionAbortedError:
+            except (ConnectionAbortedError, ConnectionResetError):
                 break
 
             except AttributeError:
@@ -106,19 +109,14 @@ class Client:
         if self.connected:
             if (self.messages or message) and save_message:
                 self.client_info = self.make_client_info(self)
-                try:
-                    self.all_client_info.remove(self.client_info)
-
-                except ValueError as e:
-                    print ("[VALUE ERROR] ", e)
-
-                except Exception as e:
-                    print ("[ERROR] ", e)
-
+                self.all_client_info.remove(self.client_info)
                 self.messages.append(message)
 
                 self.client_info = self.make_client_info(self)
                 self.all_client_info.append(self.client_info)
+                self.client_info = self.make_client_info(self)
+
+                print (self.all_client_info)
 
             msg = message.encode(self.FORMAT)
             msg_len = len(msg)
@@ -133,7 +131,6 @@ class Client:
         if message and message is not None:
             return message
 
-        print ("Invalid message: " + str(message))
         return None
 
     def disconnect(self):

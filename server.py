@@ -56,7 +56,6 @@ class Server:
                 message_len = int(message_len)
                 message = self.receive_message(conn, size=message_len)
                 if message == self.DISCONNECT_MESSAGE:
-                    client.connected = False
                     break
 
                 elif message is None:
@@ -82,13 +81,11 @@ class Server:
                     connection.send(send)
 
         disconnect_message = f"{client.username} has disconnected !"
-        print (disconnect_message)
         client.messages.append(disconnect_message)
         self.connected_clients.remove(self.make_client_info(client))
         client_info = self.make_client_info(client)
         self.all_client_info.remove(client_info)
         self.connections.remove(conn)
-        client.disconnect()
 
     def create_client(self, conn):
         message_len = self.receive_message(conn)
@@ -113,11 +110,14 @@ class Server:
         client = Client(username, connected=True)
         client_info = self.make_client_info(client)
 
-        join_message = client.username + " has joined the chat !"
-        client_info.messages.append(join_message)
-
         self.all_client_info.append(client_info)
         self.connected_clients.append(client)
+
+        all_client_info = pickle.dumps(self.all_client_info)
+        conn.send(all_client_info)
+
+        join_message = client.username + " has joined the chat !"
+        client_info.messages.append(join_message)
 
         for connection in self.connections:
             client_info = pickle.dumps(client_info)
@@ -125,8 +125,6 @@ class Server:
             connection.send(client_info)
 
         self.connections.append(conn)
-        all_client_info = pickle.dumps(self.all_client_info)
-        conn.send(all_client_info)
         conn.send("SEND COMPLETE".encode(self.FORMAT))
 
         return client

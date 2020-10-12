@@ -64,6 +64,8 @@ class App:
         """
         Makes a client
         :param username: str
+        :param password: str
+        :param port: str or int
         :param host: str
         :returns: None
         """
@@ -89,62 +91,10 @@ class App:
             self.ChatText.pack()
 
             username_label_x = 31
-
             username_label_x -= len(username) * 5
             self.UsernameLabel.place(x=username_label_x, y=484)
 
             self.get_messages()
-
-    def get_messages(self):
-        """
-        Gets the messages from every client and displays them in the ChatListbox
-        :returns: None
-        """
-        for client_info in self.client.all_client_info:
-            if len(client_info.messages) == 1:
-                join_message = client_info.messages[0]
-
-                if join_message not in self.messages:
-                    self.messages.append(join_message)
-
-            else:
-                for message_index in range(-1, len(client_info.messages) - 1):
-                    if message_index:
-                        message = client_info.messages[message_index]
-
-                        if message == self.DISCONNECT_MESSAGE:
-                            print ("disconnecting")
-                            message = f"{client_info.username} has disconnected !"
-
-                        else:
-                            message = f"{client_info.username}: {message}"
-
-                        if message not in self.messages:
-                            self.messages.append(message)
-
-        self.ChatListbox.delete(0, tk.END)
-        for message in self.messages:
-            self.ChatListbox.insert(tk.END, message)
-
-        self.parent.after(50, self.get_messages)
-
-    def send_message(self, message):
-        """
-        Sends a message to the server
-        :param message: str
-        :returns: None
-        """
-        message = message.strip("\n")
-        if message != self.DISCONNECT_MESSAGE:
-            self.messages.append(f"{self.client.username}: {message}")
-            self.ChatListbox.insert(tk.END, f"{self.client.username}: {message}")
-
-        else:
-            self.messages.append(message)
-            self.ChatListbox.insert(tk.END, f"{self.client.username} has disconnected !")
-
-        self.client.send_message(message)
-        self.ChatText.delete("1.0", tk.END)
 
     def create_client(self, username, password, port, host):
         """
@@ -190,6 +140,52 @@ class App:
 
         return False
 
+    def get_messages(self):
+        """
+        Gets the messages from every client and displays them in the ChatListbox
+        :returns: None
+        """
+        for client_info in self.client.all_client_info:
+            if len(client_info.messages) == 1:
+                join_message = client_info.messages[0]
+
+                if join_message not in self.messages:
+                    self.messages.append(join_message)
+
+            else:
+                for message_index in range(-1, len(client_info.messages) - 1):
+                    if message_index:
+                        message = client_info.messages[message_index]
+                        message = f"{client_info.username}: {message}"
+
+                        if message not in self.messages:
+                            self.messages.append(message)
+
+        self.ChatListbox.delete(0, tk.END)
+        for message in self.messages:
+            self.ChatListbox.insert(tk.END, message)
+
+        self.parent.after(50, self.get_messages)
+
+    def send_message(self, message):
+        """
+        Sends a message to the server
+        :param message: str
+        :returns: None
+        """
+        message = message.strip("\n")
+        if message != self.DISCONNECT_MESSAGE:
+            self.messages.append(f"{self.client.username}: {message}")
+            self.ChatListbox.insert(tk.END, f"{self.client.username}: {message}")
+
+        else:
+            print ("disconnect")
+            self.messages.append(message)
+            self.ChatListbox.insert(tk.END, f"{self.client.username} has disconnected !")
+
+        self.client.send_message(message)
+        self.ChatText.delete("1.0", tk.END)
+
     def get_all_client_info(self):
         """
         Gets all the connected clients info
@@ -203,7 +199,7 @@ class App:
         :returns: None
         """
         if self.client is not None:
-            self.send_message(self.DISCONNECT_MESSAGE)
+            self.client.disconnect()
 
         self.parent.quit()
 

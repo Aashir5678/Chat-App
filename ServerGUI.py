@@ -30,7 +30,7 @@ class ServerGUI:
         self.CreateServerButton.pack()
 
         self.PortEntry.insert(0, "5050")
-        self.server_thread = threading.Thread(target=self.make_server, args=(self.PortEntry.get(),))
+        self.server_thread = threading.Thread(target=self.make_server)
         self.server_thread.daemon = True
         self.CreateServerButton.config(command=self.server_thread.start)
 
@@ -50,14 +50,13 @@ class ServerGUI:
 
         self.parent.after(100, self.check_for_clients)
 
-    def make_server(self, port):
+    def make_server(self):
         """
         Sets up the server
-        :param port: str or int
         :returns: None
         """
         try:
-            port = int(port)
+            port = int(self.PortEntry.get())
 
         except ValueError:
             return
@@ -76,7 +75,7 @@ class ServerGUI:
         if not self.server_password:
             pass
 
-        self.PortLabel.config(text="Port: " + str(port))
+        self.PortLabel.config(text="Port: " + str(self.server.PORT))
         self.IPLabel.pack()
         self.ClientsListbox.pack()
         self.check_for_clients()
