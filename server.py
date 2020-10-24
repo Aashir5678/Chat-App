@@ -13,8 +13,8 @@ class Server:
         self.password = password
         self.HEADER = 2048
         self.FORMAT = "utf-8"
-        self.SUCCESS = "SUCCESSFUL CONNECTION"
-        self.FAIL = "FAILED CONNECTION"
+        self.SUCCESS = b"SUCCESSFUL CONNECTION"
+        self.FAIL = b"FAILED CONNECTION"
         self.DISCONNECT_MESSAGE = "!DISCONNECT"
         self.SERVER = socket.gethostbyname(socket.gethostname())
         self.connected_clients = []
@@ -32,17 +32,19 @@ class Server:
         print ("server has started...")
         while not self.closed:
             conn, addr = self.server.accept()
-            thread = threading.Thread(target=self.handle_client, args=(conn, addr))
+            thread = threading.Thread(target=self.handle_client, args=(conn,))
             thread.daemon = True
             thread.start()
 
-    def handle_client(self, conn, addr):
-        client = self.create_client(conn)
-        if client is None:
-            conn.send(self.FAIL.encode(self.FORMAT))
+    def handle_client(self, conn):
+        client, connection_status = self.create_client(conn)
+
+        print (time.time())
+        conn.send(connection_status)
+        if connection_status == self.FAIL:
             return
 
-        conn.send(self.SUCCESS.encode(self.FORMAT))
+        print ("connection status: " + str(connection_status))
 
         while client.connected:
             try:
@@ -89,15 +91,14 @@ class Server:
 
     def create_client(self, conn):
         message_len = self.receive_message(conn)
+        password = ""
         if message_len:
             message_len = int(message_len)
             password = self.receive_message(conn, size=message_len)
 
-        else:
-            return None
-
         if password != self.password:
-            return None
+            print ("pass")
+            return None, self.FAIL
 
         message_len = self.receive_message(conn)
         if message_len:
@@ -105,7 +106,8 @@ class Server:
             username = self.receive_message(conn, size=message_len)
 
         else:
-            return None
+            print ("username")
+            return None, self.FAIL
 
         client = Client(username, connected=True)
         client_info = self.make_client_info(client)
@@ -115,6 +117,7 @@ class Server:
 
         all_client_info = pickle.dumps(self.all_client_info)
         conn.send(all_client_info)
+        conn.send(pickle.dumps(None))
 
         join_message = client.username + " has joined the chat !"
         client_info.messages.append(join_message)
@@ -125,9 +128,8 @@ class Server:
             connection.send(client_info)
 
         self.connections.append(conn)
-        conn.send("SEND COMPLETE".encode(self.FORMAT))
 
-        return client
+        return client, self.SUCCESS
 
     def make_client_info(self, client):
         username = client.username

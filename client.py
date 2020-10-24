@@ -12,11 +12,13 @@ class Client:
         self.username = username
         self.server_password = server_pass
         self.FORMAT = "utf-8"
-        self.SUCCESS = "SUCCESSFUL CONNECTION"
-        self.FAIL = "FAILED CONNECTION"
+        self.SUCCESS = b"SUCCESSFUL CONNECTION"
+        self.FAIL = b"FAILED CONNECTION"
         self.DISCONNECT_MESSAGE = "!DISCONNECT"
         self.server_machine = server_machine
         self.get_clients_thread = threading.Thread(target=self.update_all_clients)
+        self.connected = connected
+        self.messages = []
 
         try:
             self.socket = socket.gethostbyname(self.server_machine)
@@ -24,8 +26,6 @@ class Client:
         except socket.error:
             raise TypeError("Server machine does not exist")
 
-        self.connected = connected
-        self.messages = []
         self.client_info = self.make_client_info(self)
         self.all_client_info = [self.client_info]
 
@@ -44,22 +44,18 @@ class Client:
         while True:
             client_info = self.client.recv(self.HEADER)
 
-            try:
-                status = client_info.decode(self.FORMAT)
-
-            except UnicodeDecodeError:
-                data.append(client_info)
-                continue
-
-            if status == "SEND COMPLETE":
+            if pickle.loads(client_info) is None:
                 break
 
-        self.all_client_info = pickle.loads(b"".join(data))
-        connection_status = self.receive_message().decode(self.FORMAT)
+            data.append(client_info)
+
+        connection_status = self.receive_message()
         if connection_status == self.FAIL:
             print("Incorrect password...")
             self.disconnect()
             return False
+
+        self.all_client_info = pickle.loads(b"".join(data))
 
         # Add join message to messages
         join_message = f"{self.username} has joined the chat !"
@@ -178,4 +174,3 @@ if __name__ == "__main__":
         msg = input(f"{client.username}> ")
         client.send_message(msg)
         print (client.all_client_info)
-
