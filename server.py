@@ -2,6 +2,7 @@ import socket
 import threading
 import pickle
 
+### MUST DISABLE FIREWALL FOR CLIENTS FROM OTHER COMPUTERS TO JOIN ###
 
 class Server:
 	"""Represents a server which clients can connect to"""

@@ -5,7 +5,7 @@ import pickle
 
 class Client:
 	"""Represents a client in a server"""
-	def __init__(self, username, port=5050, header=1048, format_="utf-8", server_ip=socket.gethostbyname(socket.gethostname())):
+	def __init__(self, username, port=5050, header=1048, format_="utf-8", server_host=socket.gethostname()):
 		"""
 		:param port: int
 		:param header: int
@@ -14,7 +14,12 @@ class Client:
 		self.PORT = port
 		self.HEADER = header
 		self.FORMAT = format_
-		self.SERVER = sever_ip
+		try:
+			self.SERVER = socket.gethostbyname(server_host)
+
+		except socket.gaierror:
+			raise RuntimeError("Server host isn't valid...")
+			
 		self.ADDR = (self.SERVER, self.PORT)
 		self.username = username
 
@@ -69,7 +74,7 @@ class Client:
 		self.client.close()
 
 
-client = Client(input("Username: "), server_host="LAPTOP-USOUB7BL")
+client = Client(input("Username: "))
 client.join_server()
 
 while True:
