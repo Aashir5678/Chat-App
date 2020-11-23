@@ -6,7 +6,7 @@ import pickle
 
 class Server:
 	"""Represents a server which clients can connect to"""
-	def __init__(self, port=5050, header=1048, disconnect_msg="q", format_="utf-8"):
+	def __init__(self, port=5050, header=1048, server_pass="", disconnect_msg="q", format_="utf-8"):
 		"""
 		:param port: int
 		:param header: int
@@ -17,10 +17,11 @@ class Server:
 		self.HEADER = header
 		self.SERVER = socket.gethostbyname(socket.gethostname())
 		self.ADDR = (self.SERVER, self.PORT)
+		self.server_password = server_pass
 		self.DISCONNECT_MSG = disconnect_msg
 		self.FORMAT = format_
 		self.clients = {}
-		self.connections = []
+		self.connections = {}
 
 		self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -32,6 +33,10 @@ class Server:
 		self.server.bind(self.ADDR)
 		self.server.listen(5)
 		print ("server has started")
+
+		self.to_kick = input("Kick> ")
+		send_clients_thread = threading.Thread(target=self.send_clients)
+		send_clients_thread.start()
 		
 		while True:
 			conn, addr = self.server.accept()
@@ -47,63 +52,103 @@ class Server:
 		"""
 		print (f"connection from {str(addr)}")
 		username = self.receive_message(conn)
-		messages = []
-		self.clients[username] = messages
-		self.connections.append(conn)
+		server_password = self.receive_message(conn)
 
-		if len(self.connections) > 1:
-			self.send_all_clients()
+		if not username:
+			conn.close()
+			return
 
+		if self.server_password != server_password:
+			conn.send("WRONG PASSWORD".encode(self.FORMAT))
+			conn.close()
+			return
+
+		self.clients[username] = []
+		self.connections[username] = conn
 		connected = True
 
+		if username == self.to_kick:
+			if self.kick_client(username):
+				return
+
+		self.send_clients()
+
 		while connected:
-			message = self.receive_message(conn)
+			try:
+				message = self.receive_message(conn)
+
+			except ConnectionResetError:
+				connected = False
+
 			if message == self.DISCONNECT_MSG:
 				connected = False
 
 			elif not message:
 				continue
 
-			messages.append(message)
+			self.clients[username].append(message)
+			self.send_clients()
 
-			self.clients[username] = messages
-			self.send_all_clients()
 			print (f"{username}: {message}")
-			print (self.clients)
+			# print (self.clients)
 
-		print (f"{username} has disconnected !")
+		print (f"{username} has disconnected")
+		del self.clients[username]
+		del self.connections[username]
+		self.send_clients()
 		conn.close()
 
 	def receive_message(self, conn):
 		"""
-		Receives a message from the connection provided and returns it
+		Receives message from the connection provided and returns it decoded
 		:returns: str
 		"""
 		message_len = conn.recv(self.HEADER).decode(self.FORMAT)
+
 		if not message_len:
-			return
+			return ""
 
 		message_len = int(message_len)
-
 		message = conn.recv(message_len).decode(self.FORMAT)
 
 		return message
 
-	def send_all_clients(self):
+	def kick_client(self, username):
+		"""
+		Kicks the client with the username provided from the server
+		returns True if client was successfully kicked
+		:returns: bool
+		"""
+		conn = self.connections.get(username, False)
+
+		if not conn:
+			return conn
+
+		conn.send("KICKED".encode(self.FORMAT))
+		del self.connections[username]
+		del self.clients[username]
+		conn.close()
+		self.send_clients()
+		print (f"{username} has been kicked from the server")
+		return True
+
+
+	def send_clients(self):
 		"""
 		Sends an updated clients dictionary to every client
 		:returns: None
 		"""
-		for conn in self.connections:
-			conn.send(pickle.dumps(True))
-			for k, v in self.clients.items():
-				send = [k, v]
+		# clients: {"Aashir": ["hi", "what is up"]}
+		# connections: {"Aashir": socket.socket}
+		for conn in self.connections.values():
+			for client, messages in self.clients.items():
+				print ({client: messages})
+				send = [client, messages]
 				send = pickle.dumps(send)
 				conn.send(send)
 
-			conn.send(pickle.dumps(False))
-
-server = Server()
+server_pass = input("Server password: ")
+server = Server(server_pass=server_pass)
 server.start()
 
 # PORT = 5050

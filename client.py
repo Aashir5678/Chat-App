@@ -5,7 +5,7 @@ import pickle
 
 class Client:
 	"""Represents a client in a server"""
-	def __init__(self, username, port=5050, header=1048, format_="utf-8", server_host=socket.gethostname()):
+	def __init__(self, username, port=5050, header=1048, format_="utf-8", server_host=socket.gethostname(), server_pass=""):
 		"""
 		:param port: int
 		:param header: int
@@ -19,9 +19,11 @@ class Client:
 
 		except socket.gaierror:
 			raise RuntimeError("Server host isn't valid...")
-			
+		
+		self.server_password = server_pass
 		self.ADDR = (self.SERVER, self.PORT)
 		self.username = username
+		self.connected = False
 
 		self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.clients = {}
@@ -29,13 +31,22 @@ class Client:
 	def join_server(self):
 		"""
 		Connects the client to the server
-		:returns: None
+		:returns: bool
 		"""
-		self.client.connect(self.ADDR)
-		self.send_message(self.username)
+		try:
+			self.client.connect(self.ADDR)
+
+		except ConnectionRefusedError:
+			return self.connected
 
 		receive_clients_thread = threading.Thread(target=self.receive_clients)
+		self.connected = True
+
+		self.send_message(self.username)
+		self.send_message(self.server_password)
+
 		receive_clients_thread.start()
+		return self.connected
 
 	def send_message(self, msg):
 		"""
@@ -44,16 +55,22 @@ class Client:
 		:returns: None
 		"""
 		if msg == "get":
-                    print (self.clients)
-                    return
+			print (self.clients)
+			return
                 
 		message = msg.encode(self.FORMAT)
 		message_len = len(message)
 		send_len = str(message_len).encode(self.FORMAT)
 		send_len += b" " * (self.HEADER - len(send_len))
 
-		self.client.send(send_len)
-		self.client.send(message)
+		try:
+			self.client.send(send_len)
+			self.client.send(message)
+			return None
+
+		except OSError:
+			self.close()
+
 
 	def receive_clients(self):
 		"""
@@ -61,28 +78,58 @@ class Client:
 		:returns: None
 		"""
 		while True:
-			update_clients = self.client.recv(self.HEADER)
-			update_clients = pickle.loads(update_clients)
+			data = self.client.recv(self.HEADER)
+			try:
+				message = data.decode(self.FORMAT)
 
-			if update_clients:
-				if not isinstance(update_clients, bool):
-					k, v = update_clients[0], update_clients[1]
-					self.clients[k] = v
+			except UnicodeDecodeError:
+				pass
+
+			else:
+				if message == "KICKED":
+					self.close()
+					print ("Kicked from server")
+					quit()
+					
+
+				elif message == "WRONG PASSWORD":
+					self.close()
+					print ("Wrong server password")
+					quit()
+
+			try:
+				data = pickle.loads(data)
+
+			except EOFError:
+				return None
+
+			if data:
+				username, messages = data[0], data[1]
+				self.clients[username] = messages
 
 	def close(self):
 		"""
 		Closes the clients connection to the server
 		:returns: None
 		"""
+		self.connected = False
 		self.client.close()
 
+username = input("Username: ")
+server_pass = input("Server password: ")
 
-client = Client(input("Username: "), server_host='LAPTOP-USOUB7BL')
-client.join_server()
+client = Client(username, server_host='LAPTOP-USOUB7BL', server_pass=server_pass)
+connected = client.join_server()
+print (connected)
 
-while True:
-	message = input("> ")
+while connected:
+	if not connected:
+		break
+	message = input(f"{client.username}: ")
 	client.send_message(message)
 
 	if message == "q":
 		break
+
+if not client.connected:
+	client.close()
