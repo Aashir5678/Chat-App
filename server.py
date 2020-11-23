@@ -16,6 +16,8 @@ class Server:
 		self.PORT = port
 		self.HEADER = header
 		self.SERVER = socket.gethostbyname(socket.gethostname())
+		print (self.SERVER)
+		print (socket.gethostname())
 		self.ADDR = (self.SERVER, self.PORT)
 		self.server_password = server_pass
 		self.DISCONNECT_MSG = disconnect_msg
@@ -79,6 +81,9 @@ class Server:
 
 			except ConnectionResetError:
 				connected = False
+
+			except TimeoutError:
+				continue
 
 			if message == self.DISCONNECT_MSG:
 				connected = False

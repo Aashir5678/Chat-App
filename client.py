@@ -5,7 +5,7 @@ import pickle
 
 class Client:
 	"""Represents a client in a server"""
-	def __init__(self, username, port=5050, header=1048, format_="utf-8", server_host=socket.gethostname(), server_pass=""):
+	def __init__(self, username, port=5050, header=1048, format_="utf-8", server_host_name=socket.gethostname(), server_pass=""):
 		"""
 		:param port: int
 		:param header: int
@@ -15,10 +15,10 @@ class Client:
 		self.HEADER = header
 		self.FORMAT = format_
 		try:
-			self.SERVER = socket.gethostbyname(server_host)
+			self.SERVER = socket.gethostbyname(server_host_name)
 
 		except socket.gaierror:
-			raise RuntimeError("Server host isn't valid...")
+			raise RuntimeError("Server host name isn't valid...")
 		
 		self.server_password = server_pass
 		self.ADDR = (self.SERVER, self.PORT)
@@ -78,7 +78,12 @@ class Client:
 		:returns: None
 		"""
 		while True:
-			data = self.client.recv(self.HEADER)
+			try:
+				data = self.client.recv(self.HEADER)
+
+			except TimeoutError:
+				continue
+			
 			try:
 				message = data.decode(self.FORMAT)
 
@@ -118,7 +123,7 @@ class Client:
 username = input("Username: ")
 server_pass = input("Server password: ")
 
-client = Client(username, server_host='LAPTOP-USOUB7BL', server_pass=server_pass)
+client = Client(username, server_host_name='LAPTOP-USOUB7BL', server_pass=server_pass)
 connected = client.join_server()
 print (connected)
 
