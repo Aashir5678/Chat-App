@@ -1,2 +1,2 @@
 # Chat-App
-A chat app made with tkinter and sockets
+A chat app with GUI made with tkinter
