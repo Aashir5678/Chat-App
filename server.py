@@ -22,8 +22,12 @@ class Server:
 		self.server_password = server_pass
 		self.DISCONNECT_MSG = disconnect_msg
 		self.FORMAT = format_
+		self.lock = threading.Lock()
 		self.clients = {}
 		self.connections = {}
+
+		self.messages = []
+		# self.messages = ["Aashir: hello there", "Aashir: hello ?", "Rafay: Yes hello Aashir"] list is in order
 
 		self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -36,16 +40,20 @@ class Server:
 		self.server.listen(5)
 		print ("server has started")
 
-		self.to_kick = input("Kick> ")
-		send_clients_thread = threading.Thread(target=self.send_clients)
-		send_clients_thread.start()
+		# send_clients_thread = threading.Thread(target=self.send_clients)
+		# send_clients_thread.start()
 		
 		while True:
-			conn, addr = self.server.accept()
+			try:
+				conn, addr = self.server.accept()
+
+			except OSError:
+				break
+
 			client_thread = threading.Thread(target=self.handle_client, args=(conn, addr))
 			client_thread.start()
 
-		self.server.close()
+		self.close()
 
 	def handle_client(self, conn, addr):
 		"""
@@ -69,11 +77,10 @@ class Server:
 		self.connections[username] = conn
 		connected = True
 
-		if username == self.to_kick:
-			if self.kick_client(username):
-				return
-
-		self.send_clients()
+		# This block of code is causing duplicate messages for first client
+		if self.messages:
+			for message in self.messages:
+				self.send_clients(username=username, new_message=message)
 
 		while connected:
 			try:
@@ -81,27 +88,28 @@ class Server:
 
 			except ConnectionResetError:
 				connected = False
+				break
 
 			except TimeoutError:
 				continue
 
-			if message == self.DISCONNECT_MSG:
-				connected = False
-
-			elif not message:
+			if not message:
 				continue
 
+			elif message == self.DISCONNECT_MSG:
+				connected = False
+				break
+
+			self.lock.acquire()
 			self.clients[username].append(message)
-			self.send_clients()
+			message = f"{username}: {message}"
+			print (message)
 
-			print (f"{username}: {message}")
-			# print (self.clients)
+			self.messages.append(message)
+			self.send_clients(new_message=message)
+			self.lock.release()
 
-		print (f"{username} has disconnected")
-		del self.clients[username]
-		del self.connections[username]
-		self.send_clients()
-		conn.close()
+		self.disconnect_client(conn, username)
 
 	def receive_message(self, conn):
 		"""
@@ -130,31 +138,93 @@ class Server:
 			return conn
 
 		conn.send("KICKED".encode(self.FORMAT))
+		self.lock.acquire()
 		del self.connections[username]
 		del self.clients[username]
+		self.lock.release()
+
 		conn.close()
 		self.send_clients()
 		print (f"{username} has been kicked from the server")
 		return True
 
 
-	def send_clients(self):
+	def send_clients(self, username="", new_message=None):
 		"""
-		Sends an updated clients dictionary to every client
-		:returns: None
+		Sends an updated clients dictionary to every client, 
+		sends new message to every client or just the client
+		with the username specified. Returns True send was
+		successful.
+
+		:param username: str
+		:param new_message: str
+		:returns: bool
 		"""
 		# clients: {"Aashir": ["hi", "what is up"]}
 		# connections: {"Aashir": socket.socket}
+		disconnect = False
 		for conn in self.connections.values():
-			for client, messages in self.clients.items():
-				print ({client: messages})
-				send = [client, messages]
+			for client_username, messages in self.clients.items():
+				print ({client_username: messages})
+				send = [client_username, messages]
 				send = pickle.dumps(send)
-				conn.send(send)
+				try:
+					conn.send(send)
 
-server_pass = input("Server password: ")
-server = Server(server_pass=server_pass)
-server.start()
+				except ConnectionResetError:
+					print (self.clients)
+					print (self.connections)
+					disconnect = True
+					break
+
+
+		if disconnect:
+			self.disconnect_client(conn, client_username)
+
+		if new_message is not None:
+			if not username:
+				for conn in self.connections.values():
+					conn.send(new_message.encode(self.FORMAT))
+
+			else:
+				conn = self.connections.get(username, None)
+
+				if username is None:
+					return False
+
+				conn.send(new_message.encode(self.FORMAT))
+
+		return True
+
+	def disconnect_client(self, conn, username):
+		"""
+		Disconnects the client with the username provided, returns true if client was successfully disconnected
+		:param conn: socket.socket
+		:param username: str
+		:returns: bool
+		"""
+		if username not in self.clients or username not in self.connections:
+			return False
+
+		self.lock.acquire()
+		self.clients[username].append(False)
+		del self.connections[username]
+		self.lock.release()
+		print (self.clients)
+
+		conn.close()
+		print (f"{username} has disconnected")
+		self.send_clients()
+		return True
+
+	def close(self):
+		self.server.close()
+
+
+if __name__ == "__main__":
+	server_pass = input("Server password: ")
+	server = Server(server_pass=server_pass)
+	server.start()
 
 # PORT = 5050
 # SERVER = socket.gethostbyname(socket.gethostname())

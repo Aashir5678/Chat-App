@@ -1,7 +1,7 @@
 import socket
 import threading
 import pickle
-
+from _pickle import UnpicklingError
 
 class Client:
 	"""Represents a client in a server"""
@@ -27,6 +27,7 @@ class Client:
 
 		self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.clients = {}
+		self.messages = []
 
 	def join_server(self):
 		"""
@@ -40,12 +41,12 @@ class Client:
 			return self.connected
 
 		receive_clients_thread = threading.Thread(target=self.receive_clients)
-		self.connected = True
+		receive_clients_thread.start()
 
+		self.connected = True
 		self.send_message(self.username)
 		self.send_message(self.server_password)
 
-		receive_clients_thread.start()
 		return self.connected
 
 	def send_message(self, msg):
@@ -55,9 +56,9 @@ class Client:
 		:returns: None
 		"""
 		if msg == "get":
-			print (self.clients)
-			return
-                
+			print (self.messages)
+			return None
+        
 		message = msg.encode(self.FORMAT)
 		message_len = len(message)
 		send_len = str(message_len).encode(self.FORMAT)
@@ -66,7 +67,6 @@ class Client:
 		try:
 			self.client.send(send_len)
 			self.client.send(message)
-			return None
 
 		except OSError:
 			self.close()
@@ -83,6 +83,9 @@ class Client:
 
 			except TimeoutError:
 				continue
+
+			except ConnectionAbortedError:
+				break
 			
 			try:
 				message = data.decode(self.FORMAT)
@@ -92,15 +95,15 @@ class Client:
 
 			else:
 				if message == "KICKED":
-					self.close()
 					print ("Kicked from server")
-					quit()
-					
+					break
 
 				elif message == "WRONG PASSWORD":
-					self.close()
 					print ("Wrong server password")
-					quit()
+					break
+
+				else:
+					self.messages.append(message)
 
 			try:
 				data = pickle.loads(data)
@@ -108,9 +111,17 @@ class Client:
 			except EOFError:
 				return None
 
+			except UnpicklingError:
+				pass
+
 			if data:
 				username, messages = data[0], data[1]
 				self.clients[username] = messages
+
+		print ("closed")
+		self.close()
+		quit()
+
 
 	def close(self):
 		"""
@@ -120,21 +131,20 @@ class Client:
 		self.connected = False
 		self.client.close()
 
-username = input("Username: ")
-server_pass = input("Server password: ")
+if __name__ == "__main__":
+	username = input("Username: ")
+	server_pass = input("Server password: ")
 
-client = Client(username, server_host_name='LAPTOP-USOUB7BL', server_pass=server_pass)
-connected = client.join_server()
-print (connected)
+	client = Client(username, server_host_name='LAPTOP-USOUB7BL', server_pass=server_pass)
+	client.join_server()
 
-while connected:
-	if not connected:
-		break
-	message = input(f"{client.username}: ")
-	client.send_message(message)
+	while client.connected:
+		message = input(f"{client.username}: ")
+		client.send_message(message)
 
-	if message == "q":
-		break
+		if message == "q":
+			break
 
-if not client.connected:
-	client.close()
+	print ("not connected")
+	if client.connected:
+		client.close()
