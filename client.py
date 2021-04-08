@@ -1,11 +1,13 @@
+# Author: Aashir
+
 import socket
 import threading
 import pickle
 from _pickle import UnpicklingError
 
 class Client:
-	"""Represents a client in a server"""
-	def __init__(self, username, port=5050, header=1048, format_="utf-8", server_host_name=socket.gethostname(), server_pass=""):
+	"""Represents a client which can join and send messages to a Server"""
+	def __init__(self, username, server_ip, port=5050, header=1048, format_="utf-8", server_pass=""):
 		"""
 		:param port: int
 		:param header: int
@@ -14,12 +16,8 @@ class Client:
 		self.PORT = port
 		self.HEADER = header
 		self.FORMAT = format_
-		try:
-			self.SERVER = socket.gethostbyname(server_host_name)
+		self.SERVER = server_ip
 
-		except socket.gaierror:
-			raise RuntimeError("Server host name isn't valid...")
-		
 		self.server_password = server_pass
 		self.ADDR = (self.SERVER, self.PORT)
 		self.username = username
@@ -37,9 +35,15 @@ class Client:
 		try:
 			self.client.connect(self.ADDR)
 
-		except ConnectionRefusedError:
+		except ConnectionRefusedError as e:
+			print (e)
 			return self.connected
 
+		except Exception as e:
+			print (e)
+			return self.connected
+
+		# Start receiving any new clients or new client messages
 		receive_clients_thread = threading.Thread(target=self.receive_clients)
 		receive_clients_thread.start()
 
@@ -59,6 +63,8 @@ class Client:
 			print (self.messages)
 			return None
         
+        # Find out message length, and send to client before sending message
+
 		message = msg.encode(self.FORMAT)
 		message_len = len(message)
 		send_len = str(message_len).encode(self.FORMAT)
@@ -84,7 +90,7 @@ class Client:
 			except TimeoutError:
 				continue
 
-			except ConnectionAbortedError:
+			except (ConnectionAbortedError, ConnectionResetError):
 				break
 			
 			try:
@@ -93,6 +99,7 @@ class Client:
 			except UnicodeDecodeError:
 				pass
 
+			# If data is a string
 			else:
 				if message == "KICKED":
 					print ("Kicked from server")
@@ -105,6 +112,7 @@ class Client:
 				else:
 					self.messages.append(message)
 
+			# If data is not a string
 			try:
 				data = pickle.loads(data)
 
@@ -114,9 +122,14 @@ class Client:
 			except UnpicklingError:
 				pass
 
+			# If data is a list
 			if data:
-				username, messages = data[0], data[1]
-				self.clients[username] = messages
+				try:
+					username, messages = data[0], data[1]
+					self.clients[username] = messages
+
+				except TypeError:
+					print ("Invalid data: " + str(data))
 
 		print ("closed")
 		self.close()
@@ -131,11 +144,12 @@ class Client:
 		self.connected = False
 		self.client.close()
 
+
 if __name__ == "__main__":
 	username = input("Username: ")
 	server_pass = input("Server password: ")
 
-	client = Client(username, server_host_name='LAPTOP-USOUB7BL', server_pass=server_pass)
+	client = Client(username, server_ip=socket.gethostbyname(socket.gethostname()), server_pass=server_pass)
 	client.join_server()
 
 	while client.connected:
@@ -148,3 +162,4 @@ if __name__ == "__main__":
 	print ("not connected")
 	if client.connected:
 		client.close()
+		
