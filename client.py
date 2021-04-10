@@ -33,6 +33,9 @@ class Client:
 		Connects the client to the server
 		:returns: bool
 		"""
+
+		self.client.settimeout(20)
+
 		try:
 			self.client.connect(self.ADDR)
 
@@ -45,9 +48,12 @@ class Client:
 
 			return self.connected
 
-		except Exception as e:
-			print (e)
+		except socket.timeout:
+			print ("timed out :/")
 			return self.connected
+
+		else:
+			self.client.settimeout(None)
 
 		# Start receiving any new clients or new client messages
 		receive_clients_thread = threading.Thread(target=self.receive_clients)
