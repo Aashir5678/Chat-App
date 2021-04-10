@@ -282,7 +282,8 @@ class Server:
 
 if __name__ == "__main__":
 	server = Server()
-	server.bind_server()
+	bound = server.bind_server()
+	print (bound)
 	server.start()
 
 
