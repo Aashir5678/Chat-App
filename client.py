@@ -42,14 +42,14 @@ class Client:
 		except ConnectionRefusedError as e:
 			return self.connected
 
+		except socket.timeout:
+			print ("timed out :/")
+			return self.connected
+
 		except WindowsError as e:
 			if e.winerror == 10060:
 				print ("couldn't connect to server because it took too long to respond or it has failed to respond")
 
-			return self.connected
-
-		except socket.timeout:
-			print ("timed out :/")
 			return self.connected
 
 		else:
@@ -114,7 +114,7 @@ class Client:
 			# If data is a string
 			else:
 				if message == self.DISCONNECT_MSG:
-					print ("Kicked from server")
+					print ("Disconnected from server")
 					break
 
 				elif message == "WRONG PASSWORD":
@@ -160,7 +160,7 @@ class Client:
 if __name__ == "__main__":
 	username = input("Username: ")
 	server_pass = input("Server password: ")
-	server_ip = "192.168.157.1"
+	server_ip = "192.168.0.12"
 
 	client = Client(username, server_ip, server_pass=server_pass)
 	client.join_server()
@@ -175,4 +175,3 @@ if __name__ == "__main__":
 	print ("not connected")
 	if client.connected:
 		client.close()
-

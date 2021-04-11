@@ -33,6 +33,7 @@ class Server:
 		self.clients = {}
 		# ordered messages
 		self.messages = []
+		self.banned_ips = []
 
 		self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -89,14 +90,22 @@ class Server:
 		username = self.receive_message(conn)
 		server_password = self.receive_message(conn)
 
-		if not username or username in self.clients:
+		if addr[0] in self.banned_ips:
+			print ("banned")
+			conn.send(self.DISCONNECT_MSG)
 			conn.close()
 			return
 
-		if self.server_password != server_password:
+		if not username or username in self.clients:
+			conn.send(self.DISCONNECT_MSG)
+			conn.close()
+			return
+
+		elif self.server_password != server_password:
 			conn.send("WRONG PASSWORD".encode(self.FORMAT))
 			conn.close()
 			return
+
 
 		# Store client and send all messges to client
 		connected = True
@@ -106,10 +115,9 @@ class Server:
 		self.messages.append(join_message)
 		self.lock.release()
 		self.send_clients(new_message=join_message)
-		self.clients[username] = [conn, []]
+		self.clients[username] = [conn, [], addr]
 
 		for message in self.messages:
-			print (f"Sending message to new client {username}: {message}")
 			self.send_clients(username=username, new_message=message)
 
 		while connected:
@@ -178,7 +186,7 @@ class Server:
 		# clients: {"Aashir": [conn, ["hi", "whats up", "messages"]]}
 		# print (self.clients)
 		for client_username, client_info in self.clients.items():
-			conn, messages = client_info
+			conn, messages, addr = client_info
 			send = [client_username, messages]
 			send = pickle.dumps(send)
 			try:
@@ -243,6 +251,32 @@ class Server:
 		self.lock.release()
 
 		return True
+
+	def ban_ip(self, ip):
+		"""
+		Bans the specified ip address from the server
+		:param ip: str
+		:returns: None
+		"""
+		self.banned_ips.append(ip)
+		
+		for client_username, client_info in self.clients.items():
+			client_ip = client_info[-1][0]
+			if client_ip in self.banned_ips:
+				self.disconnect_client(client_username)
+
+	def unban_ip(self, ip):
+		"""
+		Unbans the specified ip address from the server, if ip is successfully 
+		unbanned, then True if returned, otherwise False is returned
+		:param ip: str
+		:returns: bool
+		"""
+		if ip in self.banned_ips:
+			self.banned_ips.remove(ip)
+			return True
+
+		return False
 
 	def disconnect_client(self, username):
 		"""
