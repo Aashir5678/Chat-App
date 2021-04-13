@@ -160,10 +160,15 @@ class Client:
 if __name__ == "__main__":
 	username = input("Username: ")
 	server_pass = input("Server password: ")
-	server_ip = "192.168.0.12"
+	server_ips = socket.gethostbyname_ex("HOSTNAME")[-1]
 
-	client = Client(username, server_ip, server_pass=server_pass)
-	client.join_server()
+	for server_ip in server_ips:
+		client = Client(username, server_ip, server_pass=server_pass)
+		connected = client.join_server()
+
+		if connected:
+			break
+
 
 	while client.connected:
 		message = input(f"{client.username}: ")

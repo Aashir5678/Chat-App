@@ -20,7 +20,8 @@ class Server:
 		"""
 		self.PORT = port
 		self.HEADER = header
-		self.SERVER = socket.gethostbyname(socket.gethostname())
+		self.HOST = socket.gethostname()
+		self.SERVER = socket.gethostbyname_ex(self.HOST)[-1][-1]
 		self.ADDR = (self.SERVER, self.PORT)
 		print (self.ADDR)
 		self.server_password = server_pass
