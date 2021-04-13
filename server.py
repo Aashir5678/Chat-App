@@ -19,13 +19,13 @@ class Server:
 		:param format: str
 		"""
 		self.PORT = port
-		self.DISCONNECT_MSG = "!DISCONNECT".encode("utf-8")
 		self.HEADER = header
 		self.SERVER = socket.gethostbyname(socket.gethostname())
 		self.ADDR = (self.SERVER, self.PORT)
 		print (self.ADDR)
 		self.server_password = server_pass
 		self.FORMAT = format_
+		self.DISCONNECT_MSG = "!DISCONNECT".encode(self.FORMAT)
 		self.started = False
 		self.lock = threading.Lock()
 
@@ -63,7 +63,6 @@ class Server:
 			return None
 
 		print ("server has started")
-		# print (self.port_in_use(self.PORT))
 
 		# Wait for any incoming connections, and handle that connection
 		while True:
@@ -71,7 +70,8 @@ class Server:
 				conn, addr = self.server.accept()
 				print (conn, addr)
 
-			except OSError:
+			except OSError as e:
+				print (f"OSError: {str(e)}")
 				break
 
 			client_thread = threading.Thread(target=self.handle_client, args=(conn, addr))
@@ -254,16 +254,27 @@ class Server:
 
 	def ban_ip(self, ip):
 		"""
-		Bans the specified ip address from the server
+		Bans the specified ip address from the server, if ip address isn't valid
+		then False is returned, if it is valid True is returned
 		:param ip: str
-		:returns: None
+		:returns: bool
 		"""
+		# Validate ip address
+
+		try:
+			socket.inet_aton(ip)
+
+		except:
+			return False
+
 		self.banned_ips.append(ip)
 		
 		for client_username, client_info in self.clients.items():
 			client_ip = client_info[-1][0]
 			if client_ip in self.banned_ips:
 				self.disconnect_client(client_username)
+
+		return True
 
 	def unban_ip(self, ip):
 		"""
