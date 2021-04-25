@@ -58,13 +58,8 @@ class ClientGUI:
 		server_host_name = self.ServerHostNameEntry.get()
 		server_ips = None
 
-		if not server_host_name:
-			server_ip = gethostbyname(gethostname())
-			print (server_ip)
-
-		elif server_host_name == gethostname():
-			server_ip = gethostbyname(gethostname())
-			print (gethostbyname_ex(gethostname()))
+		if not server_host_name or server_host_name == gethostname():
+			server_ip = gethostbyname_ex(server_host_name)[-1][-1]
 
 		else:
 			try:
@@ -75,7 +70,6 @@ class ClientGUI:
 
 			if len(server_ips) == 1:
 				server_ip = server_ips[0]
-				print (server_ip)
 				server_ips = None
 
 		if not username:
@@ -89,23 +83,6 @@ class ClientGUI:
 
 		except ValueError:
 			return
-
-		for widget in self.parent.winfo_children():
-			widget.destroy()
-
-		self.parent.geometry("400x500")
-
-		self.ChatListbox = tk.Listbox(self.parent, width=50, height=25)
-		self.ChatScrollbar = tk.Scrollbar(self.parent)
-		self.ChatText = tk.Text(self.parent, height=1, width=30)
-		self.SendButton = tk.Button(self.parent, text="Send", width=20, height=2, font=("Arial", 8, "bold"))
-		self.chat_updater = tk.Toplevel(self.parent)
-		self.chat_updater.withdraw()
-
-		self.SendButton.config(command=self.send_message)
-		self.ChatText.bind("<Return>", lambda event: self.send_message())
-		self.ChatListbox.config(yscrollcommand=self.ChatScrollbar.set)
-		self.ChatScrollbar.config(command=self.ChatListbox.yview)
 
 		if server_ips is not None:
 			for server_ip in server_ips:
@@ -124,6 +101,23 @@ class ClientGUI:
 
 			if not connected:
 				return
+
+		for widget in self.parent.winfo_children():
+			widget.destroy()
+
+		self.parent.geometry("400x500")
+
+		self.ChatListbox = tk.Listbox(self.parent, width=50, height=25)
+		self.ChatScrollbar = tk.Scrollbar(self.parent)
+		self.ChatText = tk.Text(self.parent, height=1, width=30)
+		self.SendButton = tk.Button(self.parent, text="Send", width=20, height=2, font=("Arial", 8, "bold"))
+		self.chat_updater = tk.Toplevel(self.parent)
+		self.chat_updater.withdraw()
+
+		self.SendButton.config(command=self.send_message)
+		self.ChatText.bind("<Return>", lambda event: self.send_message())
+		self.ChatListbox.config(yscrollcommand=self.ChatScrollbar.set)
+		self.ChatScrollbar.config(command=self.ChatListbox.yview)
 
 		self.ChatScrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 		self.ChatListbox.pack(pady=10)
