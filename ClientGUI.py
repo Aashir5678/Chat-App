@@ -60,6 +60,11 @@ class ClientGUI:
 
 		if not server_host_name:
 			server_ip = gethostbyname(gethostname())
+			print (server_ip)
+
+		elif server_host_name == gethostname():
+			server_ip = gethostbyname(gethostname())
+			print (gethostbyname_ex(gethostname()))
 
 		else:
 			try:
@@ -70,6 +75,7 @@ class ClientGUI:
 
 			if len(server_ips) == 1:
 				server_ip = server_ips[0]
+				print (server_ip)
 				server_ips = None
 
 		if not username:
@@ -112,6 +118,13 @@ class ClientGUI:
 			else:
 				return
 
+		else:
+			self.client = Client(username, server_ip, port=port, server_pass=server_password)
+			connected = self.client.join_server()
+
+			if not connected:
+				return
+
 		self.ChatScrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 		self.ChatListbox.pack(pady=10)
 		self.ChatText.pack()
@@ -148,6 +161,10 @@ class ClientGUI:
 
 	def send_message(self):
 		message = self.ChatText.get("1.0", tk.END).strip("\n")
+		if message == "get":
+			print (self.client.messages)
+			return
+			
 		self.ChatText.delete("1.0", tk.END)
 		self.ChatText.see("1.0")
 
