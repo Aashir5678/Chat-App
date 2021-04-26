@@ -2,6 +2,7 @@
 
 import tkinter as tk
 from tkinter import TclError
+from tkinter.messagebox import showerror
 from client import Client
 from ServerGUI import ServerGUI
 from time import sleep
@@ -19,10 +20,6 @@ class ClientGUI:
 
 		self.UsernameLabel = tk.Label(self.parent, text="Username:", font=("Arial", 16, "bold"))
 		self.UsernameEntry = tk.Entry(self.parent)
-
-		### REMOVE ###
-		self.UsernameEntry.insert(0, "Aashir")
-
 
 		self.PortLabel = tk.Label(self.parent, text="Port:", font=("Arial", 16, "bold"))
 		self.PortEntry = tk.Entry(self.parent)
@@ -73,6 +70,7 @@ class ClientGUI:
 				server_ips = None
 
 		if not username:
+			showerror("Invalid username", "Username is invalid")
 			return
 
 		elif not port:
@@ -82,6 +80,7 @@ class ClientGUI:
 			port = int(port)
 
 		except ValueError:
+			showerror("Invalid port", "Port is invalid")
 			return
 
 		if server_ips is not None:
