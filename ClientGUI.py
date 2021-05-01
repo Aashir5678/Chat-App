@@ -104,16 +104,18 @@ class ClientGUI:
 		for widget in self.parent.winfo_children():
 			widget.destroy()
 
-		self.parent.geometry("400x500")
+		self.parent.geometry("400x575")
 
 		self.ChatListbox = tk.Listbox(self.parent, width=50, height=25)
 		self.ChatScrollbar = tk.Scrollbar(self.parent)
 		self.ChatText = tk.Text(self.parent, height=1, width=30)
 		self.SendButton = tk.Button(self.parent, text="Send", width=20, height=2, font=("Arial", 8, "bold"))
+		self.ClientsButton = tk.Button(self.parent, text="View Clients", width=20, height=2, font=("Arial", 8, "bold"))
 		self.chat_updater = tk.Toplevel(self.parent)
 		self.chat_updater.withdraw()
 
 		self.SendButton.config(command=self.send_message)
+		self.ClientsButton.config(command=self.view_clients)
 		self.ChatText.bind("<Return>", lambda event: self.send_message())
 		self.ChatListbox.config(yscrollcommand=self.ChatScrollbar.set)
 		self.ChatScrollbar.config(command=self.ChatListbox.yview)
@@ -122,6 +124,7 @@ class ClientGUI:
 		self.ChatListbox.pack(pady=10)
 		self.ChatText.pack()
 		self.SendButton.pack(pady=10)
+		self.ClientsButton.pack(pady=10)
 
 		# When the "x" in the top right is clicked, call self.quit
 		self.parent.protocol("WM_DELETE_WINDOW", self.quit)
@@ -151,6 +154,32 @@ class ClientGUI:
 			return
 
 		self.chat_updater.after(10, self.update_chat_listbox)
+
+	def view_clients(self):
+		self.ViewClients = tk.Toplevel(self.parent)
+		self.ViewClients.geometry("300x200")
+		self.ViewClients.title("View Clients")
+
+		self.ClientLabel = tk.Label(self.ViewClients, text="Clients:")
+		self.ClientsListbox = tk.Listbox(self.ViewClients, height=8, width=25)
+
+		self.ClientLabel.pack()
+		self.ClientsListbox.pack()
+		self.update_clients_listbox()
+
+
+	def update_clients_listbox(self):
+		try:
+			self.ClientsListbox.delete(0, tk.END)
+
+		except TclError:
+			return
+
+		# Insert all clients except if client has disconnected
+		for client_username in self.client.clients:
+			self.ClientsListbox.insert(tk.END, f"{client_username}")
+
+		self.parent.after(10, self.update_clients_listbox)
 
 	def send_message(self):
 		message = self.ChatText.get("1.0", tk.END).strip("\n")

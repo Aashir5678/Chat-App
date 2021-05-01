@@ -41,19 +41,20 @@ class ServerGUI:
 		self.StartServerButton.pack()
 
 	@staticmethod
-	def color_code_listbox(listbox):
+	def color_code_listbox(listbox, colors={"join_message_color": "green", "disconnect_message_color": "red", "kick_message_color": "orange"}):
 		for index, message in enumerate(listbox.get(0, tk.END)):
-			# Change disconnect messages to red
-			if ":" not in message and "disconnected" in message:
-				listbox.itemconfig(index, {"fg": "red"})
+			if ":" not in message:
+				# Change disconnect messages to red
+				if "disconnected" in message:
+					listbox.itemconfig(index, {"fg": colors["disconnect_message_color"]})
 
-			# Change join messages to green
-			elif ":" not in message and "joined" in message:
-				listbox.itemconfig(index, {"fg": "green"})
+				# Change join messages to green
+				elif "joined" in message:
+					listbox.itemconfig(index, {"fg": colors["join_message_color"]})
 
-			# Change kick messages to orange
-			elif ":" not in message and "kicked" in message:
-				listbox.itemconfig(index, {"fg": "orange"})
+				# Change kick messages to orange
+				else:
+					listbox.itemconfig(index, {"fg": colors["kick_message_color"]})
 
 	def start_server(self):
 		server_port = self.PortEntry.get()
@@ -139,9 +140,11 @@ class ServerGUI:
 	def update_clients_listbox(self):
 		self.ClientsListbox.delete(0, tk.END)
 
-		# Insert all client messages except if client has disconnected
+		# Insert all clients except if client has disconnected
 		for client_username, client_info in self.server.clients.items():
-			if False not in client_info[1]:
+			client_connected = client_info[0].fileno()
+
+			if client_connected != -1:
 				self.ClientsListbox.insert(tk.END, f"{client_username} ({client_info[-1][0]})")
 
 		self.parent.after(10, self.update_clients_listbox)
