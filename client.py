@@ -162,30 +162,29 @@ class Client:
 
 
 if __name__ == "__main__":
-	username = input("Username: ")
+    username = input("Username: ")
     host_name = input("Host Name (leave blank for localhost): ")
     server_pass = input("Server password: ")
+    if host_name:
+	server_ips = socket.gethostbyname_ex(host_name)[-1]
 
-	if host_name:
-		server_ips = socket.gethostbyname_ex(host_name)[-1]
+    else:
+	server_ips = socket.gethostbyname_ex(socket.gethostname())[-1]
 
-	else:
-		server_ips = socket.gethostbyname_ex(socket.gethostname())[-1]
+    for server_ip in server_ips:
+	client = Client(username, server_ip, server_pass=server_pass)
+	connected = client.join_server()
 
-	for server_ip in server_ips:
-		client = Client(username, server_ip, server_pass=server_pass)
-		connected = client.join_server()
+	if connected:
+            break
 
-		if connected:
-			break
+    while client.connected:
+	message = input(f"{client.username}: ")
+	client.send_message(message)
 
-	while client.connected:
-		message = input(f"{client.username}: ")
-		client.send_message(message)
+	if message == "q":
+	    break
 
-		if message == "q":
-			break
-
-	print ("not connected")
-	if client.connected:
-		client.close()
+    print ("not connected")
+    if client.connected:
+	client.close()
