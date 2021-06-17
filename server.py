@@ -26,7 +26,9 @@ class Server:
 		print (self.ADDR)
 		self.server_password = server_pass
 		self.FORMAT = format_
-		self.DISCONNECT_MSG = "!DISCONNECT".encode(self.FORMAT)
+		self.DISCONNECT_MSG = "!DISCONNECT"
+		self.WRONG_PASS_MSG = "!WRONGPASSWORD"
+		self.NEW_CLIENT_MSG = "!NEWCLIENT"
 		self.started = False
 		self.lock = threading.Lock()
 
@@ -91,12 +93,12 @@ class Server:
 		server_password = self.receive_message(conn)
 
 		if addr[0] in self.banned_ips:
-			conn.send(self.DISCONNECT_MSG)
+			self.send_string_message(conn, self.DISCONNECT_MSG)
 			conn.close()
 			return None
 
 		elif not username:
-			conn.send(self.DISCONNECT_MSG)
+			self.send_string_message(conn, self.DISCONNECT_MSG)
 			conn.close()
 			return None
 
@@ -105,12 +107,12 @@ class Server:
 			client_connected = client[0].fileno()
 
 			if client_connected != -1:
-				conn.send(self.DISCONNECT_MSG)
+				self.send_string_message(conn, self.DISCONNECT_MSG)
 				conn.close()
 				return None
 
 		elif self.server_password != server_password:
-			conn.send("WRONG PASSWORD".encode(self.FORMAT))
+			self.send_string_message(conn, self.WRONG_PASS_MSG)
 			conn.close()
 			return None
 
@@ -123,19 +125,13 @@ class Server:
 		self.lock.acquire()
 		self.messages.append(join_message)
 		self.lock.release()
-		self.send_clients(new_message=join_message)
-		self.clients[username] = [conn, [], addr]
-
-		for message in self.messages:
-			self.send_clients(username=username, new_message=message)
+		self.clients[username] = [conn, addr, []]
+		self.send_client_message(username=username)
+		self.broadcast_new_client(username)
 
 		while connected:
 			try:
 				message = self.receive_message(conn)
-
-			except ConnectionResetError:
-				connected = False
-				break
 
 			except TimeoutError:
 				continue
@@ -147,12 +143,12 @@ class Server:
 			# Add message to clients dictionary, and send that message to every other client
 
 			self.lock.acquire()
-			self.clients[username][1].append(message)
+			self.clients[username][-1].append(message)
 			message = f"{username}: {message}"
 			print (message)
 
 			self.messages.append(message)
-			self.send_clients(new_message=message)
+			self.send_client_message(new_message=message)
 			self.lock.release()
 
 		self.disconnect_client(username)
@@ -166,72 +162,154 @@ class Server:
 		try:
 			message_len = conn.recv(self.HEADER).decode(self.FORMAT)
 
-		except (ConnectionAbortedError, OSError) as e:
+		except (ConnectionAbortedError, OSError, ConnectionResetError) as e:
 			return e
 
 		if not message_len:
 			return ""
 
 		message_len = int(message_len)
-		message = conn.recv(message_len).decode(self.FORMAT)
+
+		try:
+			message = conn.recv(message_len).decode(self.FORMAT)
+
+		except (ConnectionAbortedError, OSError, ConnectionResetError) as e:
+			return e
+
 
 		return message
 
-	def send_clients(self, username="", new_message=None):
+	def send_client_message(self, username="", new_message=None):
 		"""
-		Sends an updated clients dictionary to every client, 
-		sends new message to every client or just the client
-		with the username specified. Returns True if send was
-		successful.
+		Sends a message to the client with the username provided,
+		if no username is provided then the new message is sent
+		to every client, if a username is provided but new_message
+		is None, then all the messages sent are sent to the client
+		with that username.
 
 		:param username: str
 		:param new_message: str
 		:returns: bool
 		"""
 
-		# clients: {"Aashir": [conn, ["hi", "whats up", "messages"]]}
-		# print (self.clients)
-		for client_username, client_info in self.clients.items():
+		# Send one new message to client with the username
+		if username and new_message is not None:
+			client_info = self.clients.get(username, None)
+
+			if client_info is not None:
+				conn = client_info[0]
+				self.send_string_message(conn, new_message)
+				return True
+
+			return False
+
+		# Send all messages to client with the username
+		elif username and new_message is None:
+			client_info = self.clients.get(username)
 			conn = client_info[0]
-			send = pickle.dumps((client_username,))
 
-			try:
-				conn.send(send)
+			for message in self.messages:
+				self.send_string_message(conn, message)
 
-			except ConnectionResetError:
-				print (self.clients)
-				self.disconnect_client(client_username)
-				break
+			return True
 
-			# If client is kicked
-			except OSError:
-				pass
+		# Sends one new message to all clients in server
+		elif not username:
+			for client_username, client_info in self.clients.items():
+				conn = client_info[0]
+				self.send_string_message(conn, new_message)
 
-		if new_message is not None:
-			if not username:
-				for client_info in self.clients.values():
-					conn = client_info[0]
-					try:
-						conn.send(new_message.encode(self.FORMAT))
+			return True
 
-					except OSError:
-						pass
 
-			else:
-				if username is None:
-					return False
+		return False
 
-				client_info = self.clients.get(username, None)
-				if client_info is not None:
-					conn = client_info[0]
+		# for client_username, client_info in self.clients.items():
+		# 	conn = client_info[0]
+		# 	send = pickle.dumps((client_username,))
 
-				try:
-					conn.send(new_message.encode(self.FORMAT))
+		# 	try:
+		# 		conn.send(send)
 
-				except OSError:
-					pass
+		# 	except ConnectionResetError as e:
+		# 		print ("connection reset error in send clients")
+		# 		print (e)
+		# 		self.disconnect_client(client_username)
+		# 		break
+
+		# 	# If client is kicked
+		# 	except OSError:
+		# 		pass
+
+		# if new_message is not None:
+		# 	# Send new message to all clients
+		# 	if not username:
+		# 		for client_info in self.clients.values():
+		# 			conn = client_info[0]
+		# 			try:
+		# 				conn.send(new_message.encode(self.FORMAT))
+
+		# 			except OSError:
+		# 				pass
+
+		# 	elif username is not None:
+		# 		client_info = self.clients.get(username, None)
+		# 		if client_info is not None:
+		# 			conn = client_info[0]
+
+		# 		else:
+		# 			return False
+
+		# 		try:
+		# 			if ":" not in new_message and "joined the chat." in new_message:
+		# 				conn.send(self.NEW_CLIENT_MSG)
+		# 			conn.send(new_message.encode(self.FORMAT))
+
+		# 		except OSError:
+		# 			pass
+
+
+		# 	else:
+		# 		return False
+
+		# return True
+
+
+	def broadcast_new_client(self, client_username):
+		"""
+		Sends the new client to every other
+		client in the server
+		:param client_username: str
+		:returns: bool
+		"""
+		for username, client_info in self.clients.items():
+			conn = client_info[0]
+			send = f"{client_username} has joined the chat."
+			self.send_string_message(conn, send)
 
 		return True
+
+	def send_string_message(self, conn, msg):
+		"""
+		Sends a message to the connection provided
+		:param conn: socket.socket
+		:param msg: str
+		:returns: None
+		"""
+
+		# Find out message length to send to server sending actual message
+
+		message = msg.encode(self.FORMAT)
+		message_len = len(message)
+		send_len = str(message_len).encode(self.FORMAT)
+		send_len += b" " * (self.HEADER - len(send_len))
+
+		try:
+			conn.send(send_len)
+			conn.send(message)
+
+		except OSError:
+			pass
 
 	def ban_ip(self, ip):
 		"""
@@ -251,7 +329,7 @@ class Server:
 		self.banned_ips.append(ip)
 		
 		for client_username, client_info in self.clients.items():
-			client_ip = client_info[-1][0]
+			client_ip = client_info[1][0]
 			if client_ip in self.banned_ips:
 				self.disconnect_client(client_username)
 
@@ -276,20 +354,19 @@ class Server:
 		:param username: str
 		:returns: bool
 		"""
-		print (f"kicking client: {username}")
 		if username not in self.clients:
 			print ("non existing client")
 			return False
 
 		self.lock.acquire()
 		conn = self.clients[username][0]
-		conn.send(self.DISCONNECT_MSG)
+		self.send_string_message(conn, self.DISCONNECT_MSG)
 
 		conn.close()
 		disconnect_msg = f"{username} has been kicked."
 		print (disconnect_msg)
 		self.messages.append(disconnect_msg)
-		self.send_clients(new_message=disconnect_msg)
+		self.send_client_message(new_message=disconnect_msg)
 		self.lock.release()
 
 		return True
@@ -300,25 +377,18 @@ class Server:
 		:param username: str
 		:returns: bool
 		"""
-		if username not in self.clients:
-			return False
-
-		elif False in self.clients[username][1]:
+		if (username not in self.clients) or (False in self.clients[username][-1]):
 			return False
 
 		self.lock.acquire()
 		conn = self.clients[username][0]
-		try:
-			conn.send(self.DISCONNECT_MSG)
-
-		except OSError:
-			pass
+		self.send_string_message(conn, self.DISCONNECT_MSG)
 
 		conn.close()
 		disconnect_msg = f"{username} has disconnected."
 		print (disconnect_msg)
 		self.messages.append(disconnect_msg)
-		self.send_clients(new_message=disconnect_msg)
+		self.send_client_message(new_message=disconnect_msg)
 		self.lock.release()
 
 		return True
