@@ -98,7 +98,8 @@ class ClientGUI:
 			self.client = Client(username, server_ip, port=port, server_pass=server_password)
 			connected = self.client.join_server()
 
-			if not connected:
+			if not self.client.connected:
+				print ("wrong pass")
 				return
 
 		for widget in self.parent.winfo_children():
@@ -184,6 +185,7 @@ class ClientGUI:
 	def send_message(self):
 		message = self.ChatText.get("1.0", tk.END).strip("\n")
 		if message == "get":
+			print (self.client.clients)
 			print (self.client.messages)
 			return
 			

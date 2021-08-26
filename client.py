@@ -166,39 +166,15 @@ class Client:
 					self.messages.append(message)
 					
 
-			# else:
-			# 	try:
-			# 		message = pickle.loads(data)
-
-			# 	except (EOFError, UnpicklingError):
-			# 		print (f"couldn't unpickle: {message}")
-			# 		break
-
-				# Receive new client and add to clients list
-				# try:
-				# 	print (f"Received message from server: {message}")
-				# 	username = message[0]
-					
-				# 	if username not in self.clients and data not in self.messages:
-				# 		self.clients.append(username)
-				# 		self.messages.append(f"{username} has joined the chat.")
-
-				# 	elif data not in self.messages:
-				# 		self.messages.append(f"{username} has joined the chat.")
-
-				# except TypeError:
-				# 	print ("Invalid data: " + str(message))
-
-		self.close("Client quit")
+		self.close()
 		quit()
 
 
-	def close(self, reason):
+	def close(self):
 		"""
 		Closes the clients connection to the server
 		:returns: None
 		"""
-		print (reason)
 		self.connected = False
 		self.client.close()
 
@@ -231,4 +207,4 @@ if __name__ == "__main__":
 
 	print ("not connected")
 	if client.connected:
-		client.close("q pressed")
+		client.close()

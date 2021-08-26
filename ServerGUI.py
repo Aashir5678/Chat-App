@@ -145,7 +145,7 @@ class ServerGUI:
 			client_connected = client_info[0].fileno()
 
 			if client_connected != -1:
-				self.ClientsListbox.insert(tk.END, f"{client_username} ({client_info[-1][0]})")
+				self.ClientsListbox.insert(tk.END, f"{client_username} ({client_info[1][0]})")
 
 		self.parent.after(10, self.update_clients_listbox)
 
